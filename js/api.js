@@ -65,14 +65,25 @@ class StockAPI {
   }
 
   /**
-   * 네이버 증권에서 한국 주식 정보 가져오기 (로컬 서버 필요)
+   * 네이버 증권에서 한국 주식 정보 가져오기
    *
-   * 주의: 이 기능을 사용하려면 server.py를 실행해야 합니다.
-   * 명령어: python server.py
+   * 환경 자동 감지:
+   * - 로컬 개발: localhost:5000 (server.py)
+   * - Vercel 배포: /api/naver (Serverless Function)
    */
   static async getNaverStockInfo(stockCode) {
     try {
-      const apiUrl = `http://localhost:5000/api/stock/naver/${stockCode}`;
+      // 환경 감지 및 API URL 선택
+      let apiUrl;
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        // 로컬 개발 환경
+        apiUrl = `http://localhost:5000/api/stock/naver/${stockCode}`;
+      } else {
+        // Vercel 배포 환경
+        apiUrl = `/api/naver?code=${stockCode}`;
+      }
+
+      console.log(`[API] ${window.location.hostname} → ${apiUrl}`);
 
       const response = await fetch(apiUrl, {
         method: 'GET',
@@ -82,7 +93,7 @@ class StockAPI {
       });
 
       if (!response.ok) {
-        console.warn(`${stockCode} 정보를 찾을 수 없습니다.`);
+        console.warn(`${stockCode} 정보를 찾을 수 없습니다. (Status: ${response.status})`);
         return null;
       }
 
@@ -97,21 +108,28 @@ class StockAPI {
       return {
         symbol: stockCode,
         name: data.name,
-        price: data.current_price,
+        price: data.currentPrice || data.current_price,
         pe: data.per,
         pb: data.pbr,
         ps: data.psr,
-        historical: data.historical || {},  // { "2021": {per: 25.5, pbr: 35.2, psr: 28.5}, ... }
+        historical: data.historical || {},
         consensus: data.consensus || null
       };
 
     } catch (error) {
       console.error('네이버 증권 조회 실패:', error);
-      // 사용자에게 서버 시작 안내
-      if (error.message.includes('Failed to fetch')) {
-        console.warn('⚠️ 로컬 서버가 실행 중이 아닙니다.');
-        console.warn('명령어를 실행하세요: python server.py');
+
+      // 환경별 에러 메시지
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        if (error.message.includes('Failed to fetch')) {
+          console.warn('⚠️ 로컬 서버가 실행 중이 아닙니다.');
+          console.warn('명령어를 실행하세요: python server.py');
+        }
+      } else {
+        console.warn('⚠️ 클라우드 서버에서 데이터를 불러올 수 없습니다.');
+        console.warn('Vercel 함수가 배포되었는지 확인하세요.');
       }
+
       return null;
     }
   }
