@@ -1,0 +1,6 @@
+flask
+pandas
+requests
+lxml
+gunicorn
+FinanceDataReader
